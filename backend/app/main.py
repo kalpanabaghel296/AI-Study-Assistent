@@ -5,12 +5,12 @@ from fastapi.responses import JSONResponse
 
 from .config import FRONTEND_ORIGIN
 from .db import db
-from .routes import tutor, documents, learning
+from .routes import tutor, documents, learning, auth
 
 
 app = FastAPI(
-    title="StudyMate AI API",
-    description="AI-powered personal learning assistant",
+    title="BACKBENCH API",
+    description="BACKBENCH — Just Learn Differently.",
     version="1.0.0"
 )
 
@@ -39,6 +39,12 @@ app.add_middleware(
 # -----------------------------
 
 app.include_router(
+    auth.router,
+    prefix="/api/auth",
+    tags=["Authentication"]
+)
+
+app.include_router(
     tutor.router,
     prefix="/api/tutor",
     tags=["AI Tutor"]
@@ -64,7 +70,7 @@ app.include_router(
 @app.get("/")
 def home():
     return {
-        "message": "StudyMate AI API is running",
+        "message": "BACKBENCH API is running",
         "version": "1.0.0"
     }
 
@@ -77,7 +83,7 @@ def home():
 def health():
     return {
         "status": "ok",
-        "application": "StudyMate AI"
+        "application": "BACKBENCH"
     }
 
 

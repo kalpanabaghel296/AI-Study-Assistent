@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from datetime import datetime, date
 from typing import Literal, Any
@@ -7,9 +7,10 @@ import re
 from bson import ObjectId
 
 from ..db import db
+from .auth import current_user
 from ..llm import generate
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(current_user)])
 
 
 class Quiz(BaseModel):

@@ -29,14 +29,30 @@ import {
   Bookmark,
   Trash2,
   History,
-  MessageCircle
+  MessageCircle,
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  LogOut
 } from 'lucide-react';
 
 const API =
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
+const AUTH_TOKEN_KEY = 'backbench_access_token';
+
 async function req(path, opts = {}) {
-  const response = await fetch(API + path, opts);
+  const headers = new Headers(opts.headers || {});
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const response = await fetch(API + path, {
+    ...opts,
+    headers
+  });
 
   let data;
   try {
@@ -79,10 +95,278 @@ const navigation = [
 ];
 
 
+
+function BackbenchIntro({ onComplete }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onComplete, 2600);
+    return () => window.clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <div className="bb-intro-screen" role="status" aria-label="Welcome to BACKBENCH">
+      <div className="bb-intro-glow" />
+      <div className="bb-intro-content">
+        <div className="bb-intro-mark"><GraduationCap size={34} /></div>
+        <div className="bb-intro-wordmark">BACKBENCH<span>.</span></div>
+        <p className="bb-intro-tagline">Just Learn Differently.</p>
+        <div className="bb-intro-progress"><span /></div>
+      </div>
+      <span className="bb-intro-foot">YOUR LEARNING SPACE</span>
+    </div>
+  );
+}
+
+function BackbenchAuth({ onAuthenticated }) {
+  const [mode, setMode] = useState('signin');
+  const [stage, setStage] = useState('credentials');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  function clearMessages() {
+    setError('');
+    setNotice('');
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    clearMessages();
+    setBusy(true);
+
+    try {
+      if (stage === 'otp') {
+        const result = await req('/api/auth/verify-email', post({ email, otp }));
+        onAuthenticated(result);
+        return;
+      }
+
+      if (mode === 'signup') {
+        const result = await req('/api/auth/signup', post({ name, email, password }));
+        setStage('otp');
+        setNotice(result.message || 'Verification code sent. Check your email.');
+      } else {
+        const result = await req('/api/auth/login', post({ email, password }));
+        onAuthenticated(result);
+      }
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to complete this request.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    clearMessages();
+    setBusy(true);
+
+    try {
+      const result = await req('/api/auth/resend-otp', post({ email }));
+      setNotice(result.message || 'A new verification code has been sent.');
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to resend the code.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function changeMode(nextMode) {
+    setMode(nextMode);
+    setStage('credentials');
+    setOtp('');
+    clearMessages();
+  }
+
+  return (
+    <div className="bb-auth-page">
+      <section className="bb-auth-showcase">
+        <div className="bb-auth-brand">
+          <span className="bb-auth-brand-icon"><GraduationCap size={25} /></span>
+          <span>BACKBENCH</span>
+        </div>
+
+        <div className="bb-auth-showcase-copy">
+          <span className="bb-auth-eyebrow"><Sparkles size={14} /> YOUR SPACE TO LEVEL UP</span>
+          <h1>Learn on your terms.<br /><em>Grow your way.</em></h1>
+          <p>
+            Explore ideas, ask better questions, build skills and make every
+            curious moment count.
+          </p>
+          <div className="bb-auth-highlights">
+            <span><Brain size={17} /> AI-powered learning</span>
+            <span><BookOpen size={17} /> Your learning tools in one place</span>
+            <span><Sparkles size={17} /> Made for curious minds</span>
+          </div>
+        </div>
+
+        <div className="bb-auth-showcase-footer">BACKBENCH · JUST LEARN DIFFERENTLY.</div>
+      </section>
+
+      <section className="bb-auth-form-side">
+        <div className="bb-auth-mobile-brand">
+          <span className="bb-auth-brand-icon"><GraduationCap size={23} /></span>
+          <span>BACKBENCH</span>
+        </div>
+
+        <div className="bb-auth-card">
+          <span className="bb-auth-form-eyebrow">
+            {stage === 'otp' ? 'EMAIL VERIFICATION' : mode === 'signup' ? 'CREATE YOUR ACCOUNT' : 'WELCOME BACK'}
+          </span>
+
+          <h2>
+            {stage === 'otp'
+              ? 'Check your inbox.'
+              : mode === 'signup'
+                ? 'Join BACKBENCH.'
+                : 'Good to see you.'}
+          </h2>
+
+          <p className="bb-auth-description">
+            {stage === 'otp'
+              ? `Enter the six-digit code we sent to ${email}.`
+              : mode === 'signup'
+                ? 'Create your account and start learning differently.'
+                : 'Sign in to continue where you left off.'}
+          </p>
+
+          <form className="bb-auth-form" onSubmit={handleSubmit}>
+            {stage === 'otp' ? (
+              <>
+                <label htmlFor="bb-otp">Verification code</label>
+                <div className="bb-auth-input-wrap">
+                  <Mail size={18} />
+                  <input
+                    id="bb-otp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit OTP"
+                    required
+                  />
+                </div>
+                <button className="bb-auth-submit" type="submit" disabled={busy || otp.length !== 6}>
+                  {busy ? 'Verifying…' : 'Verify email'} <ArrowRight size={17} />
+                </button>
+                <button className="bb-auth-text-button" type="button" onClick={resendCode} disabled={busy}>
+                  Didn't receive the code? Resend OTP
+                </button>
+                <button
+                  className="bb-auth-text-button bb-auth-muted-button"
+                  type="button"
+                  onClick={() => { setStage('credentials'); setOtp(''); clearMessages(); }}
+                >
+                  Back to sign up
+                </button>
+              </>
+            ) : (
+              <>
+                {mode === 'signup' && (
+                  <>
+                    <label htmlFor="bb-name">Your name</label>
+                    <div className="bb-auth-input-wrap">
+                      <User size={18} />
+                      <input
+                        id="bb-name"
+                        type="text"
+                        autoComplete="name"
+                        minLength={2}
+                        maxLength={80}
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        placeholder="Enter your name"
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                <label htmlFor="bb-email">Email address</label>
+                <div className="bb-auth-input-wrap">
+                  <Mail size={18} />
+                  <input
+                    id="bb-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+
+                <label htmlFor="bb-password">Password</label>
+                <div className="bb-auth-input-wrap">
+                  <Lock size={18} />
+                  <input
+                    id="bb-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    minLength={mode === 'signup' ? 8 : undefined}
+                    maxLength={128}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={mode === 'signup' ? 'At least 8 characters' : 'Enter your password'}
+                    required
+                  />
+                  <button
+                    className="bb-auth-eye"
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+
+                <button className="bb-auth-submit" type="submit" disabled={busy}>
+                  {busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+                  <ArrowRight size={17} />
+                </button>
+              </>
+            )}
+          </form>
+
+          {error && <div className="bb-auth-alert bb-auth-error">{error}</div>}
+          {notice && <div className="bb-auth-alert bb-auth-success">{notice}</div>}
+
+          {stage === 'credentials' && (
+            <div className="bb-auth-switch">
+              {mode === 'signup' ? 'Already have an account?' : "Don't have an account?"}
+              <button type="button" onClick={() => changeMode(mode === 'signup' ? 'signin' : 'signup')}>
+                {mode === 'signup' ? 'Sign in' : 'Sign up'}
+              </button>
+            </div>
+          )}
+
+          <div className="bb-auth-tagline">Just Learn Differently.</div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function BackbenchLoading() {
+  return (
+    <div className="bb-auth-loading">
+      <div className="bb-auth-brand-icon"><GraduationCap size={25} /></div>
+      <strong>BACKBENCH</strong>
+      <span>Preparing your learning space…</span>
+    </div>
+  );
+}
+
 function MermaidDiagram({ chart }) {
   const containerRef = useRef(null);
   const [renderError, setRenderError] = useState(false);
-  const diagramId = `studymate-diagram-${useId().replace(/:/g, '')}`;
+  const diagramId = `backbench-diagram-${useId().replace(/:/g, '')}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -127,7 +411,7 @@ function MermaidDiagram({ chart }) {
     <div className="visual-explanation">
       <div className="visual-explanation-heading">
         <span>VISUAL EXPLANATION</span>
-        <span>StudyMate AI</span>
+        <span>BACKBENCH</span>
       </div>
       {renderError ? (
         <div className="diagram-fallback">
@@ -258,7 +542,7 @@ function DailyStickyNote() {
 
   if (Notification.permission === 'granted') {
     setNotificationsEnabled(true);
-    new Notification('StudyMate AI 🔔', {
+    new Notification('BACKBENCH 🔔', {
       body: 'Your study reminders are now enabled!'
     });
     return;
@@ -279,7 +563,7 @@ function DailyStickyNote() {
     if (permission === 'granted') {
       setNotificationsEnabled(true);
 
-      new Notification('StudyMate AI 🔔', {
+      new Notification('BACKBENCH 🔔', {
         body: 'Great! Your study reminders are enabled.'
       });
     } else {
@@ -345,7 +629,7 @@ function DailyStickyNote() {
           ) {
             changed = true;
 
-            new Notification('StudyMate Reminder 🔔', {
+            new Notification('BACKBENCH Reminder 🔔', {
               body: `Time to do: ${task.text}`,
               tag: `task-${task.id}`
             });
@@ -568,7 +852,7 @@ function DailyStickyNote() {
 
 
 
-export default function App() {
+function DashboardApp({ user, onLogout }) {
   const [page, setPage] = useState('Dashboard');
   const [db, setDb] = useState('checking');
   const [stats, setStats] = useState(null);
@@ -808,8 +1092,8 @@ useEffect(() => {
             <GraduationCap size={24} />
           </div>
           <div>
-            <h2>StudyMate<span> AI</span></h2>
-            <small>YOUR LEARNING COMPANION</small>
+            <h2>BACKBENCH</h2>
+            <small>JUST LEARN DIFFERENTLY</small>
           </div>
         </div>
 
@@ -844,11 +1128,20 @@ useEffect(() => {
           </div>
 
           <div className="sidebar-profile">
-            <div className="profile-avatar">S</div>
-            <div>
-              <strong>StudyMate</strong>
-              <small>Personal Workspace</small>
+            <div className="profile-avatar">{(user?.name || 'B').charAt(0).toUpperCase()}</div>
+            <div className="bb-profile-copy">
+              <strong>{user?.name || 'BACKBENCH'}</strong>
+              <small>{user?.email || 'Personal Workspace'}</small>
             </div>
+            <button
+              type="button"
+              className="bb-logout-button"
+              onClick={onLogout}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
@@ -867,7 +1160,7 @@ useEffect(() => {
               <span className="status-dot online" />
               AI Assistant Ready
             </span>
-            <div className="topbar-avatar">S</div>
+            <div className="topbar-avatar">{(user?.name || 'B').charAt(0).toUpperCase()}</div>
           </div>
         </div>
 
@@ -1027,7 +1320,7 @@ useEffect(() => {
                   <Bot size={25} />
                 </div>
                 <div>
-                  <h2>StudyMate Assistant</h2>
+                  <h2>BACKBENCH Tutor</h2>
                   <p><span className="status-dot online" /> Online · Powered by Groq</p>
                 </div>
                 <button
@@ -1099,7 +1392,7 @@ useEffect(() => {
 
                     <div className="message-body">
                       <div className="message-label">
-                        {message.role === 'You' ? 'You' : 'StudyMate AI'}
+                        {message.role === 'You' ? 'You' : 'BACKBENCH'}
                       </div>
 
                       <div className="message-content">
@@ -1115,7 +1408,7 @@ useEffect(() => {
                       <Sparkles size={17} />
                     </div>
                     <div className="message-body">
-                      <div className="message-label">StudyMate AI</div>
+                      <div className="message-label">BACKBENCH</div>
                       <div className="typing-indicator">
                         <span />
                         <span />
@@ -1259,7 +1552,7 @@ useEffect(() => {
                 {message.role === 'You' ? 'Y' : <Sparkles size={18} />}
               </div>
               <div>
-                <strong>{message.role === 'You' ? 'You' : 'StudyMate AI'}</strong>
+                <strong>{message.role === 'You' ? 'You' : 'BACKBENCH'}</strong>
                 <small>{message.role === 'You' ? 'Your question' : 'Answer from your document'}</small>
               </div>
             </div>
@@ -1447,7 +1740,7 @@ useEffect(() => {
             <PageHeading
               eyebrow="YOUR ADAPTIVE LEARNING STRATEGIST"
               title="AI Study Planner"
-              description="Tell StudyMate what you are preparing for, where you stand, and how you actually study. It will build a goal-specific roadmap."
+              description="Tell BACKBENCH what you are preparing for, where you stand, and how you actually study. It will build a goal-specific roadmap."
             />
 
             <Panel className="planner-intro">
@@ -1677,7 +1970,7 @@ useEffect(() => {
                   <div className="generator-icon orange"><Layers size={25} /></div>
                   <div>
                     <h2>Create a revision deck</h2>
-                    <p>Enter a topic and StudyMate AI will prepare your flashcards.</p>
+                    <p>Enter a topic and BACKBENCH will prepare your flashcards.</p>
                   </div>
                 </div>
                 <form
@@ -1828,7 +2121,7 @@ useEffect(() => {
         {/* LOADING */}
         {busy && page !== 'AI Tutor' && (
           <div className="loading">
-            <Sparkles size={18} /> StudyMate AI is preparing your result...
+            <Sparkles size={18} /> BACKBENCH is preparing your result...
           </div>
         )}
 
@@ -1836,11 +2129,90 @@ useEffect(() => {
         <ResultPanel out={out} />
 
         <footer className="main-footer">
-          <span>✦ StudyMate AI</span>
-          <span>Made for smarter learning.</span>
+          <span>✦ BACKBENCH</span>
+          <span>Just Learn Differently.</span>
         </footer>
 
       </main>
     </div>
   );
 }
+
+export default function App() {
+  const [showIntro, setShowIntro] = useState(
+    () => !sessionStorage.getItem('backbench_intro_seen')
+  );
+  const [token, setToken] = useState(
+    () => localStorage.getItem(AUTH_TOKEN_KEY) || ''
+  );
+  const [user, setUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(
+    () => Boolean(localStorage.getItem(AUTH_TOKEN_KEY))
+  );
+
+  useEffect(() => {
+    if (!token) {
+      setUser(null);
+      setCheckingSession(false);
+      return;
+    }
+
+    let active = true;
+
+    req('/api/auth/me')
+      .then((result) => {
+        if (active) setUser(result.user);
+      })
+      .catch(() => {
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        if (active) {
+          setToken('');
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (active) setCheckingSession(false);
+      });
+
+    return () => { active = false; };
+  }, [token]);
+
+  function handleAuthenticated(result) {
+    localStorage.setItem(AUTH_TOKEN_KEY, result.access_token);
+    setToken(result.access_token);
+    setUser(result.user);
+    setCheckingSession(false);
+  }
+
+  async function handleLogout() {
+    try {
+      await req('/api/auth/logout', post({}));
+    } catch (error) {
+      console.warn('Logout request could not be completed:', error);
+    } finally {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      setToken('');
+      setUser(null);
+    }
+  }
+
+  function finishIntro() {
+    sessionStorage.setItem('backbench_intro_seen', '1');
+    setShowIntro(false);
+  }
+
+  if (showIntro) {
+    return <BackbenchIntro onComplete={finishIntro} />;
+  }
+
+  if (checkingSession) {
+    return <BackbenchLoading />;
+  }
+
+  if (!user) {
+    return <BackbenchAuth onAuthenticated={handleAuthenticated} />;
+  }
+
+  return <DashboardApp user={user} onLogout={handleLogout} />;
+}
+

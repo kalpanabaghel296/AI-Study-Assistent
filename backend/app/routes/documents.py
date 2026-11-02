@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel, Field
 from bson import ObjectId
 from datetime import datetime
@@ -7,10 +7,11 @@ import fitz
 import re
 
 from ..db import db
+from .auth import current_user
 from ..llm import generate
 from ..config import MAX_PDF_MB
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(current_user)])
 
 
 # --------------------------------
@@ -251,7 +252,7 @@ def ask(doc_id: str, data: Ask):
             )
 
         system_prompt = """
-You are StudyMate AI, a friendly PDF learning assistant.
+You are BACKBENCH, a friendly PDF learning assistant.
 
 SOURCE RULES:
 - Answer questions using the uploaded PDF context.

@@ -2,13 +2,14 @@ from datetime import datetime
 from typing import Literal, Optional
 
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..db import db
+from .auth import current_user
 from ..llm import generate
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(current_user)])
 
 
 class ChatMessage(BaseModel):
@@ -63,7 +64,7 @@ def chat(data: Chat):
             })
             conversation_id = created.inserted_id
 
-        system_prompt = """You are StudyMate AI, a friendly, clear and practical study tutor.
+        system_prompt = """You are BACKBENCH, a friendly, clear and practical study tutor.
 Answer simple questions briefly. Explain complex concepts step by step with examples when useful. Use student-friendly language, preserve technical accuracy, and use Markdown only when it improves readability."""
         prompt_messages = [{"role": "system", "content": system_prompt}]
         prompt_messages.extend({"role": m.get("role", "user"), "content": m.get("content", "")} for m in history)
